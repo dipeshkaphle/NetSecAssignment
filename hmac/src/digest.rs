@@ -2,7 +2,7 @@ use std::{mem::size_of, ops::Mul};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DigestType<T> {
-    val: T,
+    pub val: T,
 }
 
 impl<T> DigestType<T> {
@@ -14,7 +14,7 @@ impl<T> DigestType<T> {
 pub trait DigestTrait {
     fn as_hex(&self) -> String;
     fn as_bytes(&self) -> Vec<u8>;
-    fn size(&self) -> usize;
+    fn size_in_bits(&self) -> usize;
 }
 
 impl DigestTrait for DigestType<u128> {
@@ -26,7 +26,7 @@ impl DigestTrait for DigestType<u128> {
         self.val.to_be_bytes().into_iter().collect()
     }
 
-    fn size(&self) -> usize {
+    fn size_in_bits(&self) -> usize {
         size_of::<u128>().mul(8)
     }
 }
