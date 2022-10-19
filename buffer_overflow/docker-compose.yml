@@ -1,0 +1,7 @@
+version: '3'
+services:
+  cgi-bin-vuln-app:
+    container_name: cgi-bin-vuln-app
+    build: .
+    ports:
+      - "8000:80"
