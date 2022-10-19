@@ -1,6 +1,9 @@
 use std::{env, fs::File, io::Write};
 
-use hmac::{aes, blake3::Blake3, hash::FibMulCombineHash, hmac, rsa, AES_KEY, HMAC_KEY, digest::DigestTrait, SenderStruct};
+use hmac::{
+    aes, blake3::Blake3, digest::DigestTrait, hash::FibMulCombineHash, hmac, rsa, SenderStruct,
+    AES_KEY, HMAC_KEY,
+};
 fn main() {
     if env::args().len() == 1 {
         eprintln!("Please provide the message as argument");
@@ -10,8 +13,8 @@ fn main() {
         println!("We have the message to send from the sender");
         println!("MESSAGE: {}", message);
 
-        let priv_key = rsa::encrypt(AES_KEY);
-        println!("1) We'll encrypt the AES KEY using RSA to get non repudiation");
+        let priv_key = rsa::encrypt_private(&rsa::encrypt_public(AES_KEY));
+        println!("1) We'll encrypt the AES KEY using RSA(public key of receiver) and then encrypt(RSA again with private key of sender) to get non repudiation");
 
         let enc_message = aes::encrypt(message.as_bytes(), AES_KEY);
         println!("2) We'll encrypt the message using AES to get confidentiality");
@@ -25,24 +28,28 @@ fn main() {
             "     ii) 2nd variant uses custom hashing algorithm which outputs 128 bit digest. "
         );
 
-
         println!("--------------------------------------------------------------------");
         println!("----------------------------OUTPUT----------------------------------");
         println!("--------------------------------------------------------------------\n");
         println!("ENCRYPTED AES_KEY: {:?}\n", priv_key);
         println!("ENCRYPTED MESSAGE WITH AES: {:?}\n", enc_message);
-        println!("HMAC on ENCRYPTED MESSAGE(Blake3): {:?}\n", hmac_on_enc_message_blake3.as_bytes());
-        println!("HMAC on ENCRYPTED MESSAGE(Custom Hash): {:?}\n", hmac_on_enc_message_fib_combine.as_bytes());
+        println!(
+            "HMAC on ENCRYPTED MESSAGE(Blake3): {:?}\n",
+            hmac_on_enc_message_blake3.as_bytes()
+        );
+        println!(
+            "HMAC on ENCRYPTED MESSAGE(Custom Hash): {:?}\n",
+            hmac_on_enc_message_fib_combine.as_bytes()
+        );
 
-
-        let sender_params = SenderStruct{
+        let sender_params = SenderStruct {
             rsa_enc_aes_key: priv_key,
             aes_encrypted_message: enc_message,
             hmac_blake3: hmac_on_enc_message_blake3.as_bytes().to_vec(),
-            hmac_custom_hash: hmac_on_enc_message_fib_combine.as_bytes().to_vec()
+            hmac_custom_hash: hmac_on_enc_message_fib_combine.as_bytes().to_vec(),
         };
 
-        let mut f= File::create("sender.json").unwrap();
-        let _  = f.write_all(serde_json::to_string(&sender_params).unwrap().as_bytes());
+        let mut f = File::create("sender.json").unwrap();
+        let _ = f.write_all(serde_json::to_string(&sender_params).unwrap().as_bytes());
     }
 }

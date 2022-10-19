@@ -13,7 +13,7 @@ fn main() {
 
     println!("1) Get AES Key by Rsa decryption");
 
-    let aes_priv_key = rsa::decrypt(&sender_params.rsa_enc_aes_key);
+    let aes_priv_key = rsa::decrypt_private(&rsa::decrypt_public(&sender_params.rsa_enc_aes_key));
 
     let hmac_blake3 = hmac(
         HMAC_KEY,
