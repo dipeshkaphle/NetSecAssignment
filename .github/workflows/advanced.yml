@@ -1,0 +1,22 @@
+name: Advanced Usage
+
+on: push
+
+jobs:
+  compile_and_commit:
+    name: Commit
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: docker://pandoc/latex:2.9
+        with:
+          args: --pdf-engine=xelatex --from=markdown+tex_math_single_backslash+tex_math_dollars+raw_tex -t latex -o Report.pdf -s Report.md
+
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v7
+        with:
+          author_name: github-actions
+          author_email: 41898282+github-actions[bot]@users.noreply.github.com
+          message: 'Updated pdf'
+          add: 'Report.pdf'
