@@ -368,6 +368,7 @@ int main() {
 ```
 
 ### Setup
+
 The setup of this exploit can be done easily using Docker. The entire setup has
 been dockerized. Download the files from
 [GitHub](https://github.com/dipeshkaphle/NetSecAssignment/tree/main/buffer_overflow)
@@ -380,6 +381,7 @@ The vulnerable binary can now be accessed locally from
 `http://localhost:8000/cgi-bin/vuln`
 
 ### Approach
+
 We host a vulnerable C binary file over a web server (like Apache) as a CGI
 program. CGI programs are used commonly in web applications. An unsafe program
 such as the one written above can easily be exploited to execute arbitrary code.
@@ -402,17 +404,20 @@ which the program is running. A collection of such shell codes is available at
 [shell-storm](http://shell-storm.org/shellcode/index.html).
 
 ### Demo
+
 The address of `unsafe_function` is determined as `0x5b1640` using `gdb` debugger.
 The program takes input from the query string sent in the request. Sending a
 short string like "hello" by visiting `http://localhost:8000/cgi-bin/vuln?hello`
 makes the program execute normally and we see the output in the browser as
+
 ![](./img/buffer_overflow_normal.png)  
 
 Now, we specially craft an input to overwrite the `function_pointer` with the address of the `unsafe_function`. We
 use the character "a" as padding and add the address of the function at the end
 (by URL encoding it). Now, by making a request to
-`http://localhost:8000/cgi-bin/vuln?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[%16@`
+`http://localhost:8000/cgi-bin/vuln?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`  `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[%16@`
 we see that `unsafe_function` is executed!
+
 ![](./img/buffer_overflow_unsafe.png).
 
 **Note**: The adress of `unsafe_function` might be different on your system. Thus the URL would change based on this address.
@@ -420,6 +425,7 @@ we see that `unsafe_function` is executed!
 # Illegal Packet
 
 ## Problem Statement
+
 Demonstrate Illegal Packet attack in TCP.
 
 ## Solution
@@ -466,7 +472,8 @@ def send_reset(iface):
             return
 
         rst_seq = ack
-        p = IP(src=dst_ip, dst=src_ip) / TCP(sport=dst_port, dport=src_port, flags="R", window=DEFAULT_WINDOW_SIZE, seq=rst_seq)
+        p = IP(src=dst_ip, dst=src_ip) / \
+        TCP(sport=dst_port, dport=src_port, flags="R", window=DEFAULT_WINDOW_SIZE, seq=rst_seq)
 
         log(
             "Sending RST packet",
@@ -501,6 +508,7 @@ if __name__ == "__main__":
 ```
 
 ### Approach
+
 We show illegal packet attack through TCP Reset Attack. It is performed by
 sniffing the traffic between a TCP client and server to track the sequence
 numbers. By spoofing a packet with a valid sequence number and the TCP RESET
@@ -508,25 +516,34 @@ flag enabled, an attacker can close the connection abruptly.
 The script above uses `scapy` to craft TCP packets and sniff the traffic.
 
 ### Demo
+
 TCP Reset attack can be carried out as follows:  
 1) Set up a simple TCP echo server and client using `netcat`
 2) Run the sniffer script to close the connection by spoofing a packet with
    RESET flag enabled.  
 
 The netcat server:  
+
 ![](./img/netcat_server.png)  
 
 The netcat client:  
+
 ![](./img/netcat_client.png)  
 
 In the background, the attack script was run just before the last message was
 sent. The sequence of TCP packets sent for the last message is visualised using
 the `scapy` framework.  
-#### The Message Packet  
+
+### The Message Packet  
+
 ![](./img/illegal_a.png)  
-#### ACK
+
+### ACK
+
 ![](./img/illegal_b.png)  
-#### RESET
+
+### RESET
+
 ![](./img/illegal_c.png)  
 
 And the connection is closed!
