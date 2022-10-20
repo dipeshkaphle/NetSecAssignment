@@ -295,4 +295,116 @@ func main() {
 
 # Buffer Overflow
 
+## Problem Statement
+Demonstrate Buffer Overflow in TCP.
+
+## Solution
+
+Language Used: **C**
+
+> The code is as follows:
+```c
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+
+#define QUERY_STRING_LEN 150
+
+static char buffer[100];
+static void (*function_pointer)();
+static char decoded_string[QUERY_STRING_LEN];
+
+void safe_function() {
+    printf("%s\n", "This is the normal flow of execution");
+}
+
+void unsafe_function() {
+    printf("%s\n", "This function should not be called");
+}
+
+void decode_query_string(char *query_string) {
+    int j = 0, num;
+    char num_str[3];
+    num_str[2] = '\0';
+    for (int i = 0; i < strlen(query_string) && i < QUERY_STRING_LEN;) {
+        if (query_string[i] != '%') {
+            decoded_string[j] = query_string[i];
+            i++;
+        } else {
+                i++;
+                strncpy(num_str, query_string + i, 2);
+                num = atoi(num_str);
+                num = (num / 10) * 16 + (num % 10);
+                decoded_string[j] = (char)num;
+                i += 2;
+        }
+        j++;
+    }
+}
+
+
+int main() {
+    function_pointer = &safe_function;
+    printf("%s\n\n", "Content-type: text/html");
+    decode_query_string(getenv("QUERY_STRING"));
+    // UNSAGE: `buffer` length is unchecked in this copy
+    // The query string can write beyond this buffer into the `function_pointer`
+    // which can cause arbitrary functions to be executed.
+    strcpy(buffer, decoded_string);
+    //printf("%s\n", buffer);
+    (void)(*function_pointer)();
+    return 0;
+}
+```
+
+### Setup
+The setup of this exploit can be done easily using Docker. The entire setup has
+been dockerized. Download the files from
+[GitHub](https://github.com/dipeshkaphle/NetSecAssignment/tree/main/buffer_overflow)
+and run
+```shell
+$ docker-compose build
+$ docker-compose up -d
+```
+The vulnerable binary can now be accessed locally from
+`http://localhost:8000/cgi-bin/vuln`
+
+### Approach
+We host a vulnerable C binary file over a web server (like Apache) as a CGI
+program. CGI programs are used commonly in web applications. An unsafe program
+such as the one written above can easily be exploited to execute arbitrary code.
+
+The unsafe portion of the code is in the unchecked use of the C standard library
+function `strcpy`
+```C
+strcpy(buffer, decoded_string);
+```
+
+If `decoded_string` has more characters than the size of `buffer` (which is
+100), it may overwrite beyond its designated region of memory. In this case, the
+program is written to make sure that `function_pointer` will be adjacent to
+`buffer` in memory. Thus, the address in the `function_pointer` can be
+overwritten to any value. We demonstrate one case where it is overwritten by
+another function's address (`unsafe_function`). `unsafe_function` is just used
+as a proof-of-concept. In practice, buffer overflows can be used for injecting
+*shellcode* which can give access to privileged shells or shutdown the system on
+which the program is running. A collection of such shell codes is available at
+[shell-storm](http://shell-storm.org/shellcode/index.html).
+
+### Demo
+The address of `unsafe_function` is determined as `0x5b1640` using `gdb` debugger.
+The program takes input from the query string sent in the request. Sending a
+short string like "hello" by visiting `http://localhost:8000/cgi-bin/vuln?hello`
+makes the program execute normally and we see the output in the browser as
+![](./img/buffer_overflow_normal.png)  
+
+Now, we specially craft an input to overwrite the `function_pointer` with the address of the `unsafe_function`. We
+use the character "a" as padding and add the address of the function at the end
+(by URL encoding it). Now, by making a request to
+`http://localhost:8000/cgi-bin/vuln?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[%16@`
+we see that `unsafe_function` is executed!
+![](./img/buffer_overflow_unsafe.png).
+
+**Note**: The adress of `unsafe_function` might be different on your system. Thus the URL would change based on this address.
+
 # Illegal Packet
