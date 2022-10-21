@@ -303,6 +303,167 @@ func main() {
 
 # Shrew Attack
 
+## Problem Statement
+Implement Shrew Attack
+
+## Solution
+
+Languages used: C++, NED
+Simulator: OMNeT++
+
+> The network configuration is as follows:
+```ned
+import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
+import inet.node.inet.Router;
+import inet.node.inet.StandardHost;
+import ned.DatarateChannel;
+import inet.applications.tcpapp.TcpBasicClientApp;
+
+simple ShrewClient extends TcpBasicClientApp {
+    parameters:
+    	@class(ShrewClient);
+    	double burstTime @unit(s) = default(1s);
+}
+
+network Shrew
+{
+    parameters:
+        int n;
+    types:
+        channel Channel extends DatarateChannel
+        {
+            delay = 1us;
+            datarate = 100Mbps;
+        }
+    submodules:
+        configurator: Ipv4NetworkConfigurator {
+            parameters:
+                @display("p=100,100;is=s");
+        }
+        router: Router {
+            @display("p=400,250");
+        }
+        client: StandardHost {
+            parameters:
+                @display("p=400,50");
+        }
+        bot[n]: StandardHost {
+            parameters:
+                @display("p=250,100,col,100;i=,#C01C28");
+        }
+        server: StandardHost {
+            parameters:
+                @display("i=device/server;p=650,250");
+        }
+    connections:
+        for i=0..n-1 {
+            bot[i].pppg++ <--> Channel <--> router.pppg++;
+        }
+        client.pppg++ <--> Channel <--> router.pppg++;
+        router.pppg++ <--> Channel <--> server.pppg++;
+}
+```
+
+> The parameter configuration is as follows:
+```ini
+[General]
+network = Shrew
+
+sim-time-limit = 2s
+record-eventlog = true
+
+# number of client computers
+*.n = 4
+
+# tcp apps
+**.bot[*].numApps = 1
+**.bot[*].app[*].typename = "ShrewClient"
+**.bot[*].app[0].localAddress = ""
+**.bot[*].app[0].localPort = -1
+**.bot[*].app[0].connectAddress = "server"
+**.bot[*].app[0].connectPort = 80
+**.bot[*].app[0].burstTime = 0.001s
+**.bot[*].app[0].startTime = 0s
+**.bot[*].app[0].numRequestsPerSession = 100000
+**.bot[*].app[0].requestLength = intWithUnit(200B)
+**.bot[*].app[0].replyLength = intWithUnit(200B)
+**.bot[*].app[0].thinkTime = 1ms
+**.bot[*].app[0].idleInterval = 1s
+**.bot[*].app[0].reconnectInterval = 1s
+
+**.client.numApps = 1
+**.client.app[*].typename = "TcpBasicClientApp"
+**.client.app[0].localAddress = ""
+**.client.app[0].localPort = -1
+**.client.app[0].connectAddress = "server"
+**.client.app[0].connectPort = 80
+**.client.app[0].startTime = 0s
+**.client.app[0].numRequestsPerSession = 100000
+**.client.app[0].requestLength = intWithUnit(200B)
+**.client.app[0].replyLength = intWithUnit(200B)
+**.client.app[0].thinkTime =0.2ms
+**.client.app[0].idleInterval = 0.2ms
+**.client.app[0].reconnectInterval = 1s
+
+**.server.numApps = 1
+**.server.app[*].typename = "TcpGenericServerApp"
+**.server.app[0].localAddress = ""
+**.server.app[0].localPort = 80
+**.server.app[0].replyDelay = 0s
+
+# tcp settings
+**.app[*].dataTransferMode = "object"
+
+# NIC configuration
+**.ppp[*].queue.typename = "DropTailQueue"
+**.ppp[*].queue.packetCapacity = 100
+```
+
+> The code for the ShrewClient is as follows:
+```cpp
+void ShrewClient::handleStartOperation(LifecycleOperation *operation)
+{
+    TcpBasicClientApp::handleStartOperation(operation);
+    simtime_t burstTime = par("burstTime");
+    simtime_t sendSchedule = simTime() + burstTime;
+    for (int i = 0; i < 10; i++) {
+        cMessage* sendMessage = new cMessage("send");
+        sendMessage->setKind(MSGKIND_SEND);
+        scheduleAt(sendSchedule, sendMessage);
+    }
+}
+
+void ShrewClient::sendRequest()
+{
+    TcpBasicClientApp::sendRequest();
+
+    simtime_t burstTime = par("burstTime");
+    simtime_t sendSchedule = simTime() + burstTime;
+    cMessage* sendMessage = new cMessage("send");
+    sendMessage->setKind(MSGKIND_SEND);
+    scheduleAt(sendSchedule, sendMessage);
+}
+
+Define_Module(ShrewClient);
+```
+
+## Setup
+The `shrew` folder can be opened in OMNeT++ and the simulation can be run.
+
+## Approach
+The approach is to create a client that sends a burst of requests every `burstTime` seconds. The burst is set to 10 requests. The `burstTime` is set to 1ms, each of size 200B. The bots are set to send a burst every 1ms. The client is set to send a burst every 1s. The server is set to reply to the requests immediately. The `thinkTime` is set to 0.2ms for the client and 1ms for the bots. The `idleInterval` is set to 0.2ms for the client and 1ms for the bots. The `reconnectInterval` is set to 1s for all the clients. The `numRequestsPerSession` is set to 100000 for all the clients. The `requestLength` and `replyLength` are set to 200B for all the clients. The `dataTransferMode` is set to `object` for all the clients. The `packetCapacity` is set to 100 for all the NICs.
+
+## Results
+The topology of the network:
+
+![topology](./img/topology.png)
+
+The simulation in progress:
+![simulation](./img/simulation.png)
+
+The sequence diagram of the simulation:
+![sequence](./img/sequence.png)
+
 # Buffer Overflow
 
 ## Problem Statement
